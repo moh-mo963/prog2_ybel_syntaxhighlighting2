@@ -1,0 +1,51 @@
+name: GitHub CI
+
+on:
+    # push on master branch
+    pull_request:
+        branches: [master]
+    # manually triggered
+    workflow_dispatch:
+
+jobs:
+
+    job1:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-java@v5
+              with:
+                  java-version: '25'
+                  distribution: 'temurin'
+            - uses: gradle/actions/wrapper-validation@v6
+            - run: chmod +x gradlew
+            - run: ./gradlew clean
+            - run: ./gradlew compileJava
+
+    job2:
+        needs: job1
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v6
+            -   uses: actions/setup-java@v5
+                with:
+                    java-version: '25'
+                    distribution: 'temurin'
+
+            -   uses: gradle/actions/setup-gradle@v4
+
+            -   name: Run Tests with IPv4 preference
+                run: ./gradlew test -Djava.net.preferIPv4Stack=true
+
+
+    job3:
+        needs: job2
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-java@v5
+              with:
+                  java-version: '25'
+                  distribution: 'temurin'
+            - run: chmod +x gradlew
+            - run: ./gradlew spotlessCheck -Djava.net.preferIPv4Stack=true
