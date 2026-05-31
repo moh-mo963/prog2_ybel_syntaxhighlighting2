@@ -3,7 +3,7 @@ name: GitHub CI
 on:
     # push on master branch
     pull_request:
-        branches: [master]
+        branches: [main]
     # manually triggered
     workflow_dispatch:
 
