@@ -42,44 +42,119 @@ public final class PrettyPrinterVisitor extends MiniJavaBaseVisitor<Void> {
 
     @Override
     public Void visitCompilationUnit(MiniJavaParser.CompilationUnitContext ctx) {
-        // TODO:
-        // Produce a nicely structured compilation unit:
-        // - package declaration (if present),
-        // - import declarations (one per line),
-        // - type declarations (one after another),
-        // with sensible blank lines between these parts.
+        if (ctx.packageDecl() != null) {
+            visit(ctx.packageDecl());
+            endLine();
+            if (!ctx.importDecl().isEmpty() || !ctx.typeDecl().isEmpty()) blankLine();
+        }
+
+        for (var importDecl : ctx.importDecl()) {
+            visit(importDecl);
+            endLine();
+        }
+        if (!ctx.importDecl().isEmpty() && !ctx.typeDecl().isEmpty()) blankLine();
+
+        for (int i = 0; i < ctx.typeDecl().size(); i++) {
+            visit(ctx.typeDecl(i));
+            endLine();
+            if (i + 1 < ctx.typeDecl().size()) blankLine();
+        }
+
         return null;
     }
 
     @Override
     public Void visitClassBody(MiniJavaParser.ClassBodyContext ctx) {
-        // TODO:
-        // Format the contents of a class body:
-        // - opening and closing brace,
-        // - one member declaration per line,
-        // - members indented relative to the class.
+        visit(ctx.getChild(0)); // {
+        nl();
+
+        currentIndent++;
+        for (var declaration : ctx.classBodyDeclaration()) {
+            visit(declaration);
+            endLine();
+        }
+        currentIndent--;
+
+        visit(ctx.getChild(ctx.getChildCount() - 1)); // }
         return null;
     }
 
     @Override
     public Void visitBlock(MiniJavaParser.BlockContext ctx) {
-        // TODO:
-        // Format a block:
-        // - opening and closing brace,
-        // - one blockStatement per line,
-        // - nested blocks indented further.
+        visit(ctx.getChild(0)); // {
+        nl();
+
+        currentIndent++;
+        for (var statement : ctx.blockStatement()) {
+            visit(statement);
+            endLine();
+        }
+        currentIndent--;
+
+        visit(ctx.getChild(ctx.getChildCount() - 1)); // }
         return null;
     }
 
     @Override
     public Void visitStatement(MiniJavaParser.StatementContext ctx) {
-        // TODO:
-        // Ensure that each statement (if/while/return/block/...) ends up
-        // on exactly one line, with proper indentation for nested statements.
+        if (ctx.getChild(0) instanceof MiniJavaParser.BlockContext) {
+            visit(ctx.getChild(0));
+            return null;
+        }
+
+        int firstTokenType = ctx.getStart().getType();
+        if (firstTokenType == MiniJavaLexer.IF) {
+            visit(ctx.getChild(0)); // if
+            visit(ctx.getChild(1)); // (
+            visit(ctx.expression());
+            visit(ctx.getChild(3)); // )
+            visitNestedStatement(ctx.statement(0));
+
+            if (ctx.statement().size() > 1) {
+                endLine();
+                visit(ctx.getChild(5)); // else
+                visitNestedStatement(ctx.statement(1));
+            }
+            return null;
+        }
+
+        if (firstTokenType == MiniJavaLexer.WHILE) {
+            visit(ctx.getChild(0)); // while
+            visit(ctx.getChild(1)); // (
+            visit(ctx.expression());
+            visit(ctx.getChild(3)); // )
+            visitNestedStatement(ctx.statement(0));
+            return null;
+        }
+
+        visitChildren(ctx);
+        endLine();
         return null;
     }
 
     // ---------------- helper methods ----------------
+
+    private void visitNestedStatement(MiniJavaParser.StatementContext statement) {
+        if (statement.getChild(0) instanceof MiniJavaParser.BlockContext) {
+            write(" ");
+            visit(statement);
+        } else {
+            nl();
+            currentIndent++;
+            visit(statement);
+            currentIndent--;
+        }
+    }
+
+    private void endLine() {
+        if (!atLineStart) nl();
+    }
+
+    private void blankLine() {
+        endLine();
+        if (out.length() == 0 || out.charAt(out.length() - 1) != '\n') nl();
+        if (out.length() < 2 || out.charAt(out.length() - 2) != '\n') nl();
+    }
 
     private void indent() {
         if (atLineStart) {
